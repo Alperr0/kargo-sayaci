@@ -15,7 +15,7 @@ export type GetMerchantApiResponse = {
  * - Fetches merchant info using the Ikas API client.
  * - Returns the merchant info or an appropriate error response.
  */
-export async function GET(request: NextRequest,) {
+export async function GET(request: NextRequest) {
   try {
     // Authenticate user from the request
     const user = getUserFromRequest(request);
