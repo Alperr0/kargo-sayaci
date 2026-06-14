@@ -1,25 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-
-eslint: {
-    ignoreDuringBuilds: true,
-  },
   typescript: {
     ignoreBuildErrors: true,
   },
-
-  allowedDevOrigins: ['*.trycloudflare.com'],
-  // Webpack configuration
-  webpack: (config) => {
-    // Disable fs module on client side (required for Vercel)
-    config.resolve.fallback = {
-      ...config.resolve.fallback,
-      fs: false,
-    };
-
-  
-    return config;
-  },
+  allowedDevOrigins: ['*.trycloudflare.com']
 };
 
-module.exports = nextConfig; 
+module.exports = nextConfig;
