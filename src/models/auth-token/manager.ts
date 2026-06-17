@@ -1,29 +1,34 @@
-import { AuthToken } from './index';
+import { PrismaClient } from '@prisma/client';
 
-/**
- * AuthTokenManager provides methods to manage AuthTokens.
- * Basitlik adına verileri geçici olarak hafızada tutan bir yapıya çevirdik.
- */
+// Geliştirme ortamında sürekli yeni bağlantı açılmasını engelleyen global yapı
+const globalForPrisma = global as unknown as { prisma: PrismaClient };
+export const prisma = globalForPrisma.prisma || new PrismaClient();
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+
 export class AuthTokenManager {
-  private static tokens: Map<string, AuthToken> = new Map();
-
-  static async get(authorizedAppId: string): Promise<AuthToken | undefined> {
-    return this.tokens.get(authorizedAppId);
-  }
-
-  static async put(token: AuthToken): Promise<AuthToken> {
-    this.tokens.set(token.authorizedAppId!, token);
-    return token;
-  }
-
-  static async delete(authorizedAppId: string): Promise<void> {
-    if (!this.tokens.has(authorizedAppId)) {
-      throw new Error('Token not found');
+  // Veritabanından mağazanın token'ını çeker
+  static async getToken(storeId: string): Promise<string | null> {
+    try {
+      const record = await prisma.storeToken.findUnique({
+        where: { storeId },
+      });
+      return record?.token || null;
+    } catch (error) {
+      console.error('Token çekilirken hata oluştu:', error);
+      return null;
     }
-    this.tokens.delete(authorizedAppId);
   }
 
-  static async list(): Promise<AuthToken[]> {
-    return Array.from(this.tokens.values());
+  // Yeni gelen token'ı veritabanına kaydeder veya günceller
+  static async setToken(storeId: string, token: string): Promise<void> {
+    try {
+      await prisma.storeToken.upsert({
+        where: { storeId },
+        update: { token },
+        create: { storeId, token },
+      });
+    } catch (error) {
+      console.error('Token kaydedilirken hata oluştu:', error);
+    }
   }
 }
