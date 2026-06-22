@@ -17,18 +17,11 @@ const callbackSchema = z.object({
   signature: z.string().optional(),
 });
 
-/**
- * Handles the OAuth callback for Ikas.
- * Validates code signature, optionally validates state for CSRF protection,
- * exchanges the authorization code for tokens, updates session, and redirects.
- */
 export async function GET(request: NextRequest) {
   try {
-    // Parse the request URL to extract query parameters
     const url = new URL(request.url as string, `http://${request.headers.get('host')}`);
     const { searchParams } = url;
 
-    // Validate the incoming request parameters (code, state, signature)
     const validation = validateRequest(callbackSchema, {
       code: searchParams.get('code'),
       state: searchParams.get('state') || undefined,
@@ -36,24 +29,20 @@ export async function GET(request: NextRequest) {
     });
 
     if (!validation.success) {
-      // Invalid parameters
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
     const { code, state, signature } = validation.data;
 
-    // Validate code signature
-    if (signature &&!TokenHelpers.validateCodeSignature(code, signature, config.oauth.clientSecret!)) {
+    if (signature && !TokenHelpers.validateCodeSignature(code, signature, config.oauth.clientSecret!)) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
     }
 
-    // Retrieve session and optionally check state for CSRF protection
     const session = await getSession();
     if (state && session.state && session.state !== state) {
       return NextResponse.json({ error: 'Invalid state parameter' }, { status: 400 });
     }
 
-    // Exchange authorization code for access/refresh tokens
     const tokenResponse = await OAuthAPI.getTokenWithAuthorizationCode(
       {
         code: code as string,
@@ -67,11 +56,9 @@ export async function GET(request: NextRequest) {
     );
 
     if (!tokenResponse.data) {
-      // Failed to get token
       return NextResponse.json({ error: { statusCode: 500, message: 'Failed to retrieve token' } }, { status: 500 });
     }
 
-    // Prepare a temporary token object
     const tokenTemp: Partial<AuthToken> = {
       accessToken: tokenResponse.data.access_token,
       refreshToken: tokenResponse.data.refresh_token,
@@ -82,13 +69,10 @@ export async function GET(request: NextRequest) {
       salesChannelId: null,
     };
 
-    // Create an Ikas client with the new token
     const ikas = getIkas(tokenTemp as AuthToken);
 
-    // Fetch merchant and authorized app details
     const [merchantResponse, authorizedAppResponse] = await Promise.all([ikas.queries.getMerchant(), ikas.queries.getAuthorizedApp()]);
 
-    // Validate responses
     if (
       !merchantResponse.isSuccess ||
       !merchantResponse.data ||
@@ -105,12 +89,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Extract necessary IDs and calculate token expiration date
     const authorizedAppId = authorizedAppResponse.data.getAuthorizedApp.id!;
     const merchantId = merchantResponse.data.getMerchant.id!;
     const expireDate = moment().add(tokenResponse.data.expires_in, 'seconds').toDate().toISOString();
 
-    // Build the final AuthToken object
     const token: AuthToken = {
       ...tokenTemp,
       id: authorizedAppId,
@@ -120,37 +102,23 @@ export async function GET(request: NextRequest) {
       salesChannelId: authorizedAppResponse.data.getAuthorizedApp.salesChannelId || null,
     } as AuthToken;
 
-    // Store the token for future use
     await AuthTokenManager.setToken(token.id, JSON.stringify(token));
 
-    // Update session with new merchant and app IDs, clear state, and set expiration
     session.expiresAt = new Date(Date.now() + 3600 * 1000);
     session.merchantId = merchantId;
     session.authorizedAppId = authorizedAppId;
     delete session.state;
 
-    // Save updated session
     await setSession(session);
 
-    // Create a JWT for the merchant and authorized app
-    const jwtToken = JwtHelpers.createToken(merchantId, authorizedAppId);
-
-    // Build the redirect URL for the admin panel
     const redirectUrl = `${config.adminUrl!.replace(
       '{storeName}',
       merchantResponse.data.getMerchant.storeName as string,
     )}/authorized-app/${authorizedAppId}`;
 
-    // Build the callback URL with token and redirect info
-    const callbackUrl = new URLSearchParams();
-    callbackUrl.set('token', jwtToken);
-    callbackUrl.set('redirectUrl', redirectUrl);
-    callbackUrl.set('authorizedAppId', authorizedAppId);
+    return NextResponse.redirect(redirectUrl);
 
-    // Redirect the user to the callback URL
-    return NextResponse.redirect(new URL(`/callback?${callbackUrl.toString()}`, getRedirectUri(request.headers.get('host')!)));
   } catch (error) {
-    // Log and return error response
     console.error('Callback error:', error);
     return NextResponse.json({ error: { statusCode: 500, message: 'Callback failed' } }, { status: 500 });
   }
