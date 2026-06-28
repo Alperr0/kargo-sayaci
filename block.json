@@ -1,0 +1,5 @@
+{
+  "name": "Kargo Barı",
+  "type": "block",
+  "path": "src/components/home-page/index.tsx"
+}

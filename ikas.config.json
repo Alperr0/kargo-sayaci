@@ -8,7 +8,7 @@
     {
       "name": "Kargo Barı",
       "type": "THEME_APP_EXTENSION",
-      "path": "/components/home-page"
+      "path": "/"
     }
   ]
 }
