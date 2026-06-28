@@ -4,5 +4,11 @@
   },
   "oauthRedirectPath": "/api/oauth/callback/ikas",
   "runCommand": "pnpm run dev",
-  "actions": []
+  "actions": [
+    {
+      "name": "Kargo Barı",
+      "type": "THEME_APP_EXTENSION",
+      "path": "/components/home-page"
+    }
+  ]
 }
