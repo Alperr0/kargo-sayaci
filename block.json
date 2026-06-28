@@ -1,5 +1,5 @@
 {
   "name": "Kargo Barı",
   "type": "block",
-  "path": "src/components/home-page/index.tsx"
+  "path": "src/app/storefront/cargo-bar/page.tsx"
 }
